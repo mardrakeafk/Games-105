@@ -1,5 +1,6 @@
 from direct.showbase.ShowBase import ShowBase
 import numpy as np
+from direct.showbase.ShowBaseGlobal import globalClock
 from panda3d.core import ClockObject
 import panda3d.core as pc
 import math

@@ -55,7 +55,7 @@ def part1_simple(viewer, target_pos):
     """
     viewer.create_marker(target_pos, [1, 0, 0, 1])
     joint_name, joint_parent, joint_initial_position = viewer.get_meta_data()
-    meta_data = MetaData(joint_name, joint_parent, joint_initial_position, 'RootJoint', 'lWrist_end')
+    meta_data = MetaData(joint_name, joint_parent, joint_initial_position, 'lShoulder', 'lWrist_end')
     joint_position = viewer.get_joint_positions()
     joint_orientation = viewer.get_joint_orientations()
     
@@ -112,7 +112,7 @@ def part2(viewer, bvh_name):
     bvh_joint_name, bvh_joint_parent, bvh_offset = part1_calculate_T_pose(bvh_name)
     joint_name, _, joint_initial_position = viewer.get_meta_data()
     idx = [joint_name.index(name) for name in bvh_joint_name]
-    meta_data = MetaData(bvh_joint_name, bvh_joint_parent, joint_initial_position[idx], 'lShoulder', 'lWrist')
+    meta_data = MetaData(bvh_joint_name, bvh_joint_parent, joint_initial_position[idx], 'lShoulder', 'lWrist_end')
     class UpdateHandle:
         def __init__(self, meta_data, motion_data, joint_offset):
             self.meta_data = meta_data
@@ -125,7 +125,7 @@ def part2(viewer, bvh_name):
         def update_func(self, viewer):
             joint_position, joint_orientation = part2_forward_kinematics(
                 self.joint_name, self.joint_parent, self.joint_offset, self.motion_data, self.current_frame)
-            joint_position, joint_orientation = part2_inverse_kinematics(self.meta_data, joint_position, joint_orientation, 0.1, 0.3, 1.4)
+            joint_position, joint_orientation = part2_inverse_kinematics(self.meta_data, joint_position, joint_orientation, 0.1, 0.3, 1.65)
             viewer.show_pose(self.joint_name, joint_position, joint_orientation)
             self.current_frame = (self.current_frame + 1) % self.motion_data.shape[0]
     handle = UpdateHandle(meta_data, motion_data, bvh_offset)
@@ -173,7 +173,17 @@ def main():
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
     # part2
-    # part2(viewer, 'data/walk60.bvh')
+    part2(viewer, 'data/walk60.bvh')
+
+    # test
+    # motion_data = load_motion_data('data/walk60.bvh')
+    # joint_name, joint_parent, joint_offset = part1_calculate_T_pose('data/walk60.bvh')
+    # _, _, joint_initial_position = viewer.get_meta_data()
+    # meta_data = MetaData(joint_name, joint_parent, joint_initial_position, 'lShoulder', 'lWrist_end')
+    # joint_positions, joint_orientations = part2_forward_kinematics(joint_name, joint_parent, joint_offset, motion_data, 1)
+    # joint_positions, joint_orientations = part2_inverse_kinematics(meta_data, joint_positions, joint_orientations, 0.1, 0.3, 1.4)
+    # viewer.show_pose(joint_name, joint_positions, joint_orientations)
+    # viewer.run()
     
     # bonus(viewer, np.array([0.5, 0.5, 0.5]), np.array([0, 0.5, 0.5]))
 

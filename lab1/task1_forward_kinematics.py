@@ -71,7 +71,9 @@ def part3_retarget(viewer, T_pose_bvh_path, A_pose_bvh_path):
 def main():
     # create a viewer
     viewer = SimpleViewer()
-    bvh_file_path = "data/walk60.bvh"
+    # bvh_file_path = "data/walk60.bvh"
+    # print(load_motion_data(bvh_file_path))
+    # part1_calculate_T_pose(bvh_file_path)
 
     # 请取消注释需要运行的代码
     # part1
@@ -83,6 +85,7 @@ def main():
 
     # part3
     part3_retarget(viewer, "data/walk60.bvh", "data/A_pose_run.bvh")
+    # part3_retarget_func("data/walk60.bvh", "data/A_pose_run.bvh")
 
 
 if __name__ == "__main__":
