@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import copy
+import torch
 
 
 
@@ -40,6 +41,7 @@ def from_quat_safe(data):
         return np.eye(3)
     else:
         return R.from_quat(data).as_matrix()
+
 
 
 def part1_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
@@ -297,4 +299,112 @@ def bonus_inverse_kinematics(meta_data, joint_positions, joint_orientations, lef
     输入左手和右手的目标位置，固定左脚，完成函数，计算逆运动学
     """
     
+    return joint_positions, joint_orientations
+
+def jocobian_inverse_kinematics(meta_data, joint_positions, joint_orientations, target_pose):
+    joint_parent = meta_data.joint_parent
+    joint_offset = [meta_data.joint_initial_position[i] - meta_data.joint_initial_position[joint_parent[i]] for i in
+                    range(len(joint_positions))]
+    joint_offset[0] = np.array([0., 0., 0.])
+    joint_ik_path, _, _, _ = meta_data.get_path_from_root_to_end()
+    # 用于迭代计算IK链条上各个关节的旋转
+    local_rotation = [R.from_quat(joint_orientations[joint_parent[i]]).inv() * R.from_quat(joint_orientations[i]) for i
+                      in range(len(joint_orientations))]
+    local_rotation[0] = R.from_quat(joint_orientations[0])
+    # 梯度下降方法
+    joint_offset_t = [torch.tensor(data) for data in joint_offset]
+    joint_positions_t = [torch.tensor(data) for data in joint_positions]
+    joint_orientations_t = [torch.tensor(R.from_quat(data).as_matrix(), requires_grad=True) for data in
+                            joint_orientations]
+    local_rotation_t = [torch.tensor(data.as_matrix(), requires_grad=True) for data in local_rotation]
+    target_pose_t = torch.tensor(target_pose)
+
+    epoch = 300
+    alpha = 0.25
+    for _ in range(epoch):
+        for j in range(len(joint_ik_path)):
+            # 更新链上结点的位置
+            a = chain_current = joint_ik_path[j]
+            b = chain_parent = joint_ik_path[j - 1]
+            if j == 0:
+                local_rotation_t[a] = local_rotation_t[a]
+                joint_positions_t[a] = joint_positions_t[a]
+            elif b == joint_parent[a]:  # 当前结点是前一结点的子节点，正向
+                joint_orientations_t[a] = joint_orientations_t[b] @ local_rotation_t[a]
+                joint_positions_t[a] = joint_positions_t[b] + joint_offset_t[a] @ torch.transpose(
+                    joint_orientations_t[b], 0, 1)
+            else:  # a = joint_parent[b] 当前结点是前一节点的父结点，逆向
+                joint_orientations_t[a] = joint_orientations_t[b] @ torch.transpose(local_rotation_t[b], 0, 1)
+                joint_positions_t[a] = joint_positions_t[b] + (-joint_offset_t[a]) @ torch.transpose(
+                    joint_orientations_t[a], 0, 1)
+
+        optimize_target = torch.norm(joint_positions_t[joint_ik_path[-1]] - target_pose_t)
+        if optimize_target < 0.01:
+            break
+        # 这里会自动对带了require_grad的矩阵求雅可比矩阵
+        optimize_target.backward()
+        for num in joint_ik_path:
+            if local_rotation_t[num].grad is not None:
+                tmp = local_rotation_t[num] - alpha * local_rotation_t[num].grad
+                local_rotation_t[num] = torch.tensor(tmp, requires_grad=True)
+
+    for j in range(len(joint_ik_path)):
+        a = chain_current = joint_ik_path[j]
+        b = chain_parent = joint_ik_path[j - 1]
+        if j == 0:
+            local_rotation[a] = R.from_matrix(local_rotation_t[a].detach().numpy())
+            joint_positions[a] = joint_positions[a]
+        elif b == joint_parent[a]:  # 当前结点是前一结点的子节点，正向
+            joint_orientations[a] = (R.from_quat(joint_orientations[b]) * R.from_matrix(
+                local_rotation_t[a].detach().numpy())).as_quat()
+            joint_positions[a] = joint_positions[b] + joint_offset[a] * np.asmatrix(
+                R.from_quat(joint_orientations[b]).as_matrix()).transpose()
+        else:  # a = joint_parent[b] 当前结点是前一节点的父结点，逆向
+            joint_orientations[a] = (R.from_quat(joint_orientations[b]) * R.from_matrix(
+                local_rotation_t[b].detach().numpy()).inv()).as_quat()
+            joint_positions[a] = joint_positions[b] + (-joint_offset[b]) * np.asmatrix(
+                R.from_quat(joint_orientations[a]).as_matrix()).transpose()
+
+    # 我们获得了链条上每个关节的Orientation和Position，然后我们只需要更新非链上结点的位置
+    ik_path_set = set(joint_ik_path)
+    for i in range(len(joint_positions)):
+        if i in ik_path_set:
+            joint_orientations[i] = R.from_matrix(joint_orientations_t[i].detach().numpy()).as_quat()
+        else:
+            joint_orientations[i] = (R.from_quat(joint_orientations[joint_parent[i]]) * local_rotation[i]).as_quat()
+            joint_positions[i] = joint_positions[joint_parent[i]] + joint_offset[i] * np.asmatrix(
+                R.from_quat(joint_orientations[joint_parent[i]]).as_matrix()).transpose()
+
+    return joint_positions, joint_orientations
+
+
+def part2_jacobian_inverse_kinematics(meta_data, joint_positions, joint_orientations, relative_x, relative_z, target_height):
+    """
+    输入lWrist相对于RootJoint前进方向的xz偏移，以及目标高度，IK以外的部分与bvh一致
+    """
+    path, path_name, path1, path2 = meta_data.get_path_from_root_to_end()
+    target_pose = joint_positions[0] + np.array([relative_x, target_height - joint_positions[0][1], relative_z])
+    Ori_joint_positions = copy.deepcopy(joint_positions)
+    Ori_joint_orientations = copy.deepcopy(joint_orientations)
+    relative_high = target_height - joint_positions[0][1]
+    if relative_high in animation_cache:
+        for i in range(len(joint_orientations)):
+            if i in path:
+                joint_positions[i] = animation_cache[relative_high].IK_joint_positions[i] + joint_positions[0] - \
+                                     animation_cache[relative_high].RootPosition
+                joint_orientations[i] = animation_cache[relative_high].IK_joint_orientations[i]
+            else:
+                joint_positions[i] = Ori_joint_positions[i]
+                joint_orientations[i] = Ori_joint_orientations[i]
+        return joint_positions, joint_orientations
+    IK_joint_positions, IK_joint_orientations = jocobian_inverse_kinematics(meta_data, joint_positions, joint_orientations,
+                                                                         target_pose)
+    animation_cache[relative_high] = Cache_Data(IK_joint_positions, IK_joint_orientations, joint_positions[0])
+    for i in range(len(joint_orientations)):
+        if i in path:
+            joint_positions[i] = IK_joint_positions[i]
+            joint_orientations[i] = IK_joint_orientations[i]
+        else:
+            joint_positions[i] = Ori_joint_positions[i]
+            joint_orientations[i] = Ori_joint_orientations[i]
     return joint_positions, joint_orientations

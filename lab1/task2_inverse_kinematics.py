@@ -55,11 +55,11 @@ def part1_simple(viewer, target_pos):
     """
     viewer.create_marker(target_pos, [1, 0, 0, 1])
     joint_name, joint_parent, joint_initial_position = viewer.get_meta_data()
-    meta_data = MetaData(joint_name, joint_parent, joint_initial_position, 'lShoulder', 'lWrist_end')
+    meta_data = MetaData(joint_name, joint_parent, joint_initial_position, 'RootJoint', 'lWrist_end')
     joint_position = viewer.get_joint_positions()
     joint_orientation = viewer.get_joint_orientations()
     
-    joint_position, joint_orientation = part1_inverse_kinematics(meta_data, joint_position, joint_orientation, target_pos)
+    joint_position, joint_orientation = jocobian_inverse_kinematics(meta_data, joint_position, joint_orientation, target_pos)
     viewer.show_pose(joint_name, joint_position, joint_orientation)
     viewer.run()
     pass
@@ -162,18 +162,46 @@ def bonus(viewer, left_target_pos, right_target_pos):
     
     viewer.update_marker_func = handle.update_func
     viewer.run()
-    
+
+
+def part2_jacobian(viewer, bvh_name):
+    motion_data = load_motion_data(bvh_name)
+    bvh_joint_name, bvh_joint_parent, bvh_offset = part1_calculate_T_pose(bvh_name)
+    joint_name, _, joint_initial_position = viewer.get_meta_data()
+    idx = [joint_name.index(name) for name in bvh_joint_name]
+    meta_data = MetaData(bvh_joint_name, bvh_joint_parent, joint_initial_position[idx], 'lShoulder', 'lWrist_end')
+
+    class UpdateHandle:
+        def __init__(self, meta_data, motion_data, joint_offset):
+            self.meta_data = meta_data
+            self.motion_data = motion_data
+            self.joint_name = meta_data.joint_name
+            self.joint_parent = meta_data.joint_parent
+            self.joint_offset = joint_offset
+            self.current_frame = 0
+
+        def update_func(self, viewer):
+            joint_position, joint_orientation = part2_forward_kinematics(
+                self.joint_name, self.joint_parent, self.joint_offset, self.motion_data, self.current_frame)
+            joint_position, joint_orientation = part2_jacobian_inverse_kinematics(self.meta_data, joint_position, joint_orientation, 0.1, 0.3, 1.65)
+            viewer.show_pose(self.joint_name, joint_position, joint_orientation)
+            self.current_frame = (self.current_frame + 1) % self.motion_data.shape[0]
+
+    handle = UpdateHandle(meta_data, motion_data, bvh_offset)
+    viewer.update_func = handle.update_func
+    viewer.run()
+    pass
 
 def main():
     viewer = SimpleViewer()
     
-    # part1
-    # part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
+    # part1 simple是jacobianik
+    part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
     # part1_hard(viewer, np.array([0.5, 0.5, 0.5]))
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
     # part2
-    part2(viewer, 'data/walk60.bvh')
+    # part2(viewer, 'data/walk60.bvh')
 
     # test
     # motion_data = load_motion_data('data/walk60.bvh')
@@ -184,7 +212,11 @@ def main():
     # joint_positions, joint_orientations = part2_inverse_kinematics(meta_data, joint_positions, joint_orientations, 0.1, 0.3, 1.4)
     # viewer.show_pose(joint_name, joint_positions, joint_orientations)
     # viewer.run()
-    
+
+    # jacobian ik
+    # part2_jacobian(viewer, 'data/walk60.bvh')
+
+
     # bonus(viewer, np.array([0.5, 0.5, 0.5]), np.array([0, 0.5, 0.5]))
 
 if __name__ == "__main__":
