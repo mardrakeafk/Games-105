@@ -71,7 +71,7 @@ def part3_retarget(viewer, T_pose_bvh_path, A_pose_bvh_path):
 def main():
     # create a viewer
     viewer = SimpleViewer()
-    # bvh_file_path = "data/walk60.bvh"
+    bvh_file_path = "../lab2/motion_material/kinematic_motion/long_walk.bvh"
     # print(load_motion_data(bvh_file_path))
     # part1_calculate_T_pose(bvh_file_path)
 
@@ -81,10 +81,10 @@ def main():
 
     # part2
     # part2_one_pose(viewer, bvh_file_path)
-    # part2_animation(viewer, bvh_file_path)
+    part2_animation(viewer, bvh_file_path)
 
     # part3
-    part3_retarget(viewer, "data/walk60.bvh", "data/A_pose_run.bvh")
+    # part3_retarget(viewer, "data/walk60.bvh", "data/A_pose_run.bvh")
     # part3_retarget_func("data/walk60.bvh", "data/A_pose_run.bvh")
 
 

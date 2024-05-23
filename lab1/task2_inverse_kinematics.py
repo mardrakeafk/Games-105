@@ -196,12 +196,12 @@ def main():
     viewer = SimpleViewer()
     
     # part1 simple是jacobianik
-    part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
+    # part1_simple(viewer, np.array([0.5, 0.75, 0.5]))
     # part1_hard(viewer, np.array([0.5, 0.5, 0.5]))
     # part1_animation(viewer, np.array([0.5, 0.5, 0.5]))
     
     # part2
-    # part2(viewer, 'data/walk60.bvh')
+    part2(viewer, 'data/walk60.bvh')
 
     # test
     # motion_data = load_motion_data('data/walk60.bvh')

@@ -206,6 +206,11 @@ class Controller:
     @property
     def rotation(self):
         return np.array(self.node.get_quat())[[1,2,3,0]]
+
+    @property
+    def position(self):
+        return self._node.get_pos()
+
     @property
     def cameractrl(self):
         return self.viewer.cameractrl
