@@ -320,8 +320,9 @@ def jocobian_inverse_kinematics(meta_data, joint_positions, joint_orientations, 
     target_pose_t = torch.tensor(target_pose)
 
     epoch = 300
-    alpha = 0.5
-    for _ in range(epoch):
+    alpha = 1
+    for i in range(epoch):
+        print(i)
         for j in range(len(joint_ik_path)):
             # 更新链上结点的位置
             a = chain_current = joint_ik_path[j]

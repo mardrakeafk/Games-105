@@ -269,7 +269,7 @@ class CharacterController():
         # 刷新率，以及计算速度加速度的依据
         self.dt = 1. / 60.
         # 每隔counter帧去搜索一次
-        self.counter = 2
+        self.counter = 10
         # 计数器
         self.cur_count = self.counter
         # dataset
@@ -589,13 +589,13 @@ class CharacterController():
         '''
 
         # simulation object跟随角色
-        controller.set_pos(np.array([self.bone_positions[0][0], 0., self.bone_positions[0][2]]))
-        controller.set_rot(self.bone_rotations[0])
+        # controller.set_pos(np.array([self.bone_positions[0][0], 0., self.bone_positions[0][2]]))
+        # controller.set_rot(self.bone_rotations[0])
 
         # 角色跟随simulation object
-        # self.bone_positions[0][0] = controller.position[0]
-        # self.bone_positions[0][2] = controller.position[2]
-        # self.bone_rotations[0] = controller.rotation
+        self.bone_positions[0][0] = controller.position[0]
+        self.bone_positions[0][2] = controller.position[2]
+        self.bone_rotations[0] = controller.rotation
     # 你的其他代码,state matchine, motion matching, learning, etc.
 
 

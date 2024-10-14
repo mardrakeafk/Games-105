@@ -12,15 +12,26 @@ def part1_cal_torque(pose, physics_info: PhysicsInfo, **kargs):
     输出： global_torque: (20,3)的numpy数组，表示每个关节的全局坐标下的目标力矩，根节点力矩会被后续代码无视
     '''
     # ------一些提示代码，你可以随意修改------------#
-    kp = kargs.get('kp', 500) # 需要自行调整kp和kd！ 而且也可以是一个数组，指定每个关节的kp和kd
-    kd = kargs.get('kd', 20) 
+    kp = kargs.get('kp', 300)  # 需要自行调整kp和kd！ 而且也可以是一个数组，指定每个关节的kp和kd
+    kd = kargs.get('kd', 2)
     parent_index = physics_info.parent_index
     joint_name = physics_info.joint_name
+    # 注意关节没有自己的朝向和角速度，这里用子body的朝向和角速度表示此时关节的信息
     joint_orientation = physics_info.get_joint_orientation()
     joint_avel = physics_info.get_body_angular_velocity()
 
-    global_torque = np.zeros((20,3))
-    
+    joint_rotation = (R.from_quat(joint_orientation[parent_index]).inv() * R.from_quat(joint_orientation)).as_quat()
+    joint_rotation[0] = np.copy(joint_orientation[0])
+
+    global_torque = np.zeros((16, 3))
+
+    local_torque = kp * (R.from_quat(pose) * R.from_quat(joint_rotation).inv()).as_rotvec() - kd * joint_avel
+    global_torque = (R.from_quat(joint_orientation[parent_index]).apply(local_torque))
+    global_torque[0] = local_torque[0]
+    global_torque = np.clip(global_torque, -240, 240)
+
+    # # 抹去根节点力矩
+    # global_torque[0] = np.zeros_like(global_torque[0])
     return global_torque
 
 def part2_cal_float_base_torque(target_position, pose, physics_info, **kargs):
