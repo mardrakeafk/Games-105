@@ -12,8 +12,8 @@ def part1_cal_torque(pose, physics_info: PhysicsInfo, **kargs):
     输出： global_torque: (20,3)的numpy数组，表示每个关节的全局坐标下的目标力矩，根节点力矩会被后续代码无视
     '''
     # ------一些提示代码，你可以随意修改------------#
-    kp = kargs.get('kp', 300)  # 需要自行调整kp和kd！ 而且也可以是一个数组，指定每个关节的kp和kd
-    kd = kargs.get('kd', 2)
+    kp = kargs.get('kp', 600)  # 需要自行调整kp和kd！ 而且也可以是一个数组，指定每个关节的kp和kd
+    kd = kargs.get('kd', 10)
     parent_index = physics_info.parent_index
     joint_name = physics_info.joint_name
     # 注意关节没有自己的朝向和角速度，这里用子body的朝向和角速度表示此时关节的信息
@@ -44,11 +44,14 @@ def part2_cal_float_base_torque(target_position, pose, physics_info, **kargs):
         2. global_torque[0]在track静止姿态时会被无视，但是track走路时会被加到根节点上，不然无法保持根节点朝向
     '''
     global_torque = part1_cal_torque(pose, physics_info)
-    kp = kargs.get('root_kp', 4000) # 需要自行调整root的kp和kd！
-    kd = kargs.get('root_kd', 20)
+    kp = kargs.get('root_kp', 6000)  # 需要自行调整root的kp和kd！
+    kd = kargs.get('root_kd', 10)
     root_position, root_velocity = physics_info.get_root_pos_and_vel()
     global_root_force = np.zeros((3,))
-    return global_root_force, global_torque
+    det = np.array([0, 1e-1, 0])
+    global_root_force = kp * (target_position  - root_position) - kd * root_velocity
+    global_root_torque = global_torque[0]
+    return global_root_force, global_root_torque, global_torque
 
 def part3_cal_static_standing_torque(bvh: BVHMotion, physics_info):
     '''

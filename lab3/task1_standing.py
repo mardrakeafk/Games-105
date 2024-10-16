@@ -20,12 +20,16 @@ class PDController:
 
     def apply_root_force_and_torque(self):
         position, pose, setting = self.get_pose(self.cnt)
-        global_force, torque = part2_cal_float_base_torque(position[0], pose, self.physics_info
-                                                           )
+        global_root_force, global_root_torque, torque = part2_cal_float_base_torque(position[0], pose,
+                                                                                    self.physics_info)
+        self.viewer.set_torque(torque)
         if setting == 0:
             torque[0] = np.zeros_like(torque[0])
+        # 只保留y方向的辅助力
+        global_root_force[0] = 0.0
+        global_root_force[2] = 0.0
         self.viewer.set_torque(torque)
-        self.viewer.set_root_force(global_force)
+        self.viewer.set_root_force(global_root_force)
         self.cnt += 1
     
     def apply_static_torque(self):
@@ -97,8 +101,8 @@ def main():
     viewer = SimpleViewer(True) 
     # viewer.show_axis_frame()
     
-    part1_pd_control(viewer, 0) # 数字代表不同的测试setting
-    # part2_root_force(viewer, 0)
+    # part1_pd_control(viewer, 0) # 数字代表不同的测试setting
+    part2_root_force(viewer, 1)
     # part3_static_balance(viewer, 0)
     viewer.run()
     
