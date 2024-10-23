@@ -26,8 +26,8 @@ class PDController:
         if setting == 0:
             torque[0] = np.zeros_like(torque[0])
         # 只保留y方向的辅助力
-        global_root_force[0] = 0.0
-        global_root_force[2] = 0.0
+        # global_root_force[0] = 0.0
+        # global_root_force[2] = 0.0
         self.viewer.set_torque(torque)
         self.viewer.set_root_force(global_root_force)
         self.cnt += 1

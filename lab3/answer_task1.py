@@ -12,26 +12,67 @@ def part1_cal_torque(pose, physics_info: PhysicsInfo, **kargs):
     输出： global_torque: (20,3)的numpy数组，表示每个关节的全局坐标下的目标力矩，根节点力矩会被后续代码无视
     '''
     # ------一些提示代码，你可以随意修改------------#
-    kp = kargs.get('kp', 600)  # 需要自行调整kp和kd！ 而且也可以是一个数组，指定每个关节的kp和kd
-    kd = kargs.get('kd', 10)
-    parent_index = physics_info.parent_index
+    parent_index = physics_info.parent_index  # len(parent_index) =len(joint_name) = 20
     joint_name = physics_info.joint_name
+    kp = np.zeros(len(joint_name))
+    kd = np.zeros(len(joint_name))
+
+    kp = kargs.get('kp', 500)  # 如果没有传入kp，默认为500
+    kd = kargs.get('kd', 20)  # 如果没有传入kd，默认为20
+
+    kp = np.ones(len(joint_name)) * kp
+    kd = np.ones(len(joint_name)) * kd
+
+    # 一组效果不错的kp和kd值
+
+    depth2parent = np.zeros(len(parent_index))
+    for i in range(len(parent_index)):
+        j = i
+        cnt = 0
+        while parent_index[j] != -1:
+            j = parent_index[j]
+            cnt += 1
+        depth2parent[i] = cnt
+
+    kp_ref = np.array([600, 800, 800, 800, 600, 400, 400])
+    kd_ref = np.array([100, 30, 15, 10, 8, 5, 5]) * 1.1
+    for i in range(len(joint_name)):
+        kp[i] = kp_ref[int(depth2parent[i])]
+        kd[i] = kd_ref[int(depth2parent[i])]
+
     # 注意关节没有自己的朝向和角速度，这里用子body的朝向和角速度表示此时关节的信息
     joint_orientation = physics_info.get_joint_orientation()
+    # print(physics_info.get_root_pos_and_vel())
+    parent_index = physics_info.parent_index
     joint_avel = physics_info.get_body_angular_velocity()
 
-    joint_rotation = (R.from_quat(joint_orientation[parent_index]).inv() * R.from_quat(joint_orientation)).as_quat()
-    joint_rotation[0] = np.copy(joint_orientation[0])
+    global_torque = np.zeros((20, 3))
 
-    global_torque = np.zeros((16, 3))
+    for i in range(0, len(joint_orientation)):  # 跳过根节点
+        if i != physics_info.root_idx:
+            parent_orientation = R.from_quat(joint_orientation[parent_index[i]])
+        else:
+            # set parent_orientation to identity
+            parent_orientation = R.from_quat([0, 0, 0, 1])
+        # 当前关节朝向（四元数）
+        current_orientation = parent_orientation.inv() * R.from_quat(joint_orientation[i])
+        # 目标关节朝向（四元数）
+        target_orientation = R.from_quat(pose[i])
 
-    local_torque = kp * (R.from_quat(pose) * R.from_quat(joint_rotation).inv()).as_rotvec() - kd * joint_avel
-    global_torque = (R.from_quat(joint_orientation[parent_index]).apply(local_torque))
-    global_torque[0] = local_torque[0]
-    global_torque = np.clip(global_torque, -240, 240)
+        # 计算当前与目标的旋转误差（四元数）
+        error_orientation = target_orientation * current_orientation.inv()
+        # 将旋转误差转换为旋转矢量
+        error_angle = error_orientation.as_rotvec()
 
-    # # 抹去根节点力矩
-    # global_torque[0] = np.zeros_like(global_torque[0])
+        # 计算PD控制力矩
+        torque = parent_orientation.apply(error_angle) * kp[i] + kd[i] * (-joint_avel[i])
+
+        global_torque[i] += torque
+
+    # 对力矩进行剪裁以避免过大的力矩
+    max_torque = 200  # 根据需要调整最大力矩值
+    global_torque = np.clip(global_torque, -max_torque, max_torque)
+
     return global_torque
 
 def part2_cal_float_base_torque(target_position, pose, physics_info, **kargs):
@@ -44,12 +85,11 @@ def part2_cal_float_base_torque(target_position, pose, physics_info, **kargs):
         2. global_torque[0]在track静止姿态时会被无视，但是track走路时会被加到根节点上，不然无法保持根节点朝向
     '''
     global_torque = part1_cal_torque(pose, physics_info)
-    kp = kargs.get('root_kp', 6000)  # 需要自行调整root的kp和kd！
-    kd = kargs.get('root_kd', 10)
+    kp = kargs.get('root_kp', 3000)  # 需要自行调整root的kp和kd！
+    kd = kargs.get('root_kd', 200)
     root_position, root_velocity = physics_info.get_root_pos_and_vel()
     global_root_force = np.zeros((3,))
-    det = np.array([0, 1e-1, 0])
-    global_root_force = kp * (target_position  - root_position) - kd * root_velocity
+    global_root_force = kp * (target_position - root_position) - kd * root_velocity
     global_root_torque = global_torque[0]
     return global_root_force, global_root_torque, global_torque
 
