@@ -93,6 +93,8 @@ def part2_cal_float_base_torque(target_position, pose, physics_info, **kargs):
     global_root_torque = global_torque[0]
     return global_root_force, global_root_torque, global_torque
 
+frame_cnt = 0
+
 def part3_cal_static_standing_torque(bvh: BVHMotion, physics_info):
     '''
     输入： bvh: BVHMotion类，包含了当前的动作信息，参见bvh_loader.py
@@ -103,13 +105,34 @@ def part3_cal_static_standing_torque(bvh: BVHMotion, physics_info):
         为了仿真稳定最好不要在Toe关节上加额外力矩
     '''
     tar_pos = bvh.joint_position[0][0]
-    pose = bvh.joint_rotation[0]
-    joint_name = physics_info.joint_name
-    
     joint_positions = physics_info.get_joint_translation()
     # 适当前移
     tar_pos = tar_pos * 0.8 + joint_positions[9] * 0.1 + joint_positions[10] * 0.1
 
-    torque = np.zeros((20,3))
+    pose = bvh.joint_rotation[0]
+    joint_name = physics_info.joint_name
+    global_torque = part1_cal_torque(pose, physics_info)  # part1 torque
+    joint_velocity = physics_info.get_body_velocity()
+    joint_mass = physics_info.get_body_mass()
+    # compute center of mass and COM velocity
+    com = np.zeros(3)
+    com_velocity = np.zeros(3)
+    mass = 0
+    for i in range(len(joint_mass)):
+        com += joint_mass[i] * joint_positions[i]
+        com_velocity = joint_mass[i] * joint_velocity[i]
+        mass += joint_mass[i]
+    com /= mass
+    com_velocity /= mass
+    desired_com = tar_pos
+
+    Kp = 4000
+    Kd = 20
+    virtual_force = Kp * (desired_com - com) - Kd * com_velocity
+    # 做功转化,推导，得到 torque_i = (x - p_i) .cross (f)
+    torque = global_torque
+
+    for i in range(1, len(torque)):
+        torque[i] -= np.cross(com - joint_positions[i], virtual_force)
     return torque
 
